@@ -1,0 +1,30 @@
+# === OMC 상태 파일 (절대 커밋 금지) ===
+.omc/
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === 환경 변수 / 시크릿 ===
+.env
+.env.local
+.env.*.local
+*.pem
+
+# === Node / 프론트엔드 ===
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# === Gradle / JVM (backend/.gitignore가 세부 커버) ===
+.gradle/
+**/build/
+!**/src/**/build/
+*.log
+
+# === IDE ===
+.idea/
+*.iml
+.vscode/
+*.swp

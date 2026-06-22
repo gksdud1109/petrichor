@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}  # main의 진행 빌드는 취소하지 않음
+
+jobs:
+  backend:
+    name: backend (build + Testcontainers 헬스 e2e)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+      # ubuntu-latest는 Docker 내장 → HealthIntegrationTest의 Testcontainers(PG/Redis)가 자체 기동.
+      # build = compile + Flyway V1 적용 + /actuator/health UP e2e (G0.3/G0.4)
+      - name: Gradle build
+        run: ./gradlew build --no-daemon --console=plain
+
+  secret-scan:
+    name: secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
