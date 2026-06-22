@@ -1,0 +1,69 @@
+# Petrichor 로컬 개발 인프라 — one-command: `docker compose up -d`
+# Postgres(앱 DB) + Redis(캐시/큐) + MinIO(R2 호환 로컬 오브젝트 스토리지)
+# 앱은 호스트에서 `./gradlew bootRun`으로 실행하고 아래 서비스에 접속한다.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: petrichor-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-petrichor}
+      POSTGRES_USER: ${POSTGRES_USER:-petrichor}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-petrichor}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-petrichor} -d ${POSTGRES_DB:-petrichor}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: petrichor-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: petrichor-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-petrichor}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-petrichor-secret}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+
+  # 최초 1회 미디어 버킷 생성 (R2 대체 로컬 버킷). minio 준비될 때까지 재시도.
+  # ⚠️ 아래 익명 download 정책은 로컬 개발 전용 — 스테이징/프로덕션은 비공개 버킷 + Phase 2 signed URL.
+  minio-init:
+    image: minio/mc:latest
+    container_name: petrichor-minio-init
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-petrichor} ${MINIO_ROOT_PASSWORD:-petrichor-secret}; do echo 'minio 대기...'; sleep 1; done;
+      mc mb --ignore-existing local/${MEDIA_BUCKET:-petrichor-media};
+      mc anonymous set download local/${MEDIA_BUCKET:-petrichor-media};
+      echo 'minio bucket ready';
+      "
+    restart: "no"
+
+volumes:
+  pg_data:
+  redis_data:
+  minio_data:
