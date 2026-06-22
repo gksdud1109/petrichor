@@ -39,4 +39,4 @@ management:
 info:
   app:
     name: Petrichor Backend
-    phase: "0"
+    phase: "1"
