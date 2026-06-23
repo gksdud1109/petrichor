@@ -1,61 +1,129 @@
 /**
- * Petrichor — 프론트엔드 Phase 0 셸.
- * 풀스크린 <canvas>에 무드 플레이스홀더(눅눅한 새벽 배경 + 쪽타일 그리드)를 그린다.
+ * Petrichor — 프론트엔드 Phase 1.
  *
- * Phase 1(W1.8~1.14)에서 이 2D 셸을 대체:
- *  - player/  : <video crossorigin="anonymous"> 루프 + 2버퍼 크로스페이드(심리스)
- *  - gl/      : ogl 단일 패스 셰이더 그레이딩(시안-틸 LUT·시간축 그레인·Bayer 디더·약한 색수차)
- *  - audio/   : Web Audio 레이어 믹서(빗소리·지하철·타이어) + ConvolverNode 리버브
- *  - humidity/: 마스터 uniform 슬라이더(grain·bloom·chroma·blur·rainGain·reverbWet 동시 제어)
- *  - events/  : heartbeat(30s)·session_start·slider_change 배치 에미터 → 백엔드 /api/v1/events
- *  - a11y     : prefers-reduced-motion:reduce 시 비디오 루프·그레인·크로스페이드 정지/완화
+ * 조립:
+ *   api/      매니페스트 fetch(graceful fallback)
+ *   gl/       ogl 풀스크린 쿼드 + 단일 패스 그레이딩 셰이더(절차적 눅눅한 새벽 쪽타일 씬)
+ *   audio/    Web Audio 합성 그래프(패드 + rain + subway) + ConvolverNode 리버브
+ *   humidity/ 마스터 컨트롤 — 단일 슬라이더가 셰이더 + 오디오를 A-3 lerp로 동시 구동
+ *   events/   session_start · slider_change(debounce) · 30s heartbeat → POST /events
+ *   ui/       습도 슬라이더 + 재생/일시정지 토글
+ *
+ * 제약: 실촬영 푸티지·AI 음원이 없어 절차적 플레이스홀더로 시그니처 경험을 동작.
+ *       매니페스트의 video/audio url은 보존(향후 VideoSource/오디오 파일 교체 지점).
+ * autoplay: AudioContext는 최초 사용자 제스처(클릭/키/터치)에서 resume/start.
  */
 import './style.css'
+import { loadManifest } from './api/manifest'
+import { GLStage } from './gl/renderer'
+import { AudioGraph } from './audio/graph'
+import { HumidityController } from './humidity/controller'
+import { EventEmitter } from './events/emitter'
+import { createControls } from './ui/controls'
 
 const canvas = document.querySelector<HTMLCanvasElement>('#stage')!
-const ctx = canvas.getContext('2d')!
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
 
-// 쪽타일: 구도심 외벽의 흰/미색 세로 타일 그리드 (비주얼 아이덴티티 placeholder)
-const TILE_W = 26
-const TILE_H = 92
-const GAP = 2
+async function boot(): Promise<void> {
+  const manifest = await loadManifest()
+  const humidityDefault = manifest.humidity.default
 
-function render() {
-  const w = window.innerWidth
-  const h = window.innerHeight
+  // --- GL stage ---
+  const stage = new GLStage(canvas, manifest.grade)
+  stage.setGrainAnimated(!reducedMotion.matches)
 
-  // 눅눅한 새벽: 위→아래 깊은 시안-네이비 그라데이션
-  const bg = ctx.createLinearGradient(0, 0, 0, h)
-  bg.addColorStop(0, '#0c1418')
-  bg.addColorStop(1, '#0a0f12')
-  ctx.fillStyle = bg
-  ctx.fillRect(0, 0, w, h)
+  // --- Audio graph (정지 상태로 생성; 제스처에서 start) ---
+  const audio = new AudioGraph(manifest)
 
-  // 쪽타일 그리드 (faint)
-  ctx.fillStyle = 'rgba(210, 224, 226, 0.05)'
-  for (let y = -TILE_H; y < h + TILE_H; y += TILE_H + GAP) {
-    for (let x = 0; x < w; x += TILE_W + GAP) {
-      ctx.fillRect(x, y, TILE_W, TILE_H)
+  // --- Events emitter ---
+  const events = new EventEmitter(manifest.courseId)
+  events.start(humidityDefault)
+
+  // --- Humidity master controller (manifest 전달 — 레이어별 humidityCurve 데이터 주도) ---
+  const humidity = new HumidityController(stage, audio, manifest, humidityDefault, (h) =>
+    events.sliderChange(h),
+  )
+
+  // --- Autoplay gesture gate ---
+  let audioStarted = false
+  async function ensureAudioStarted(): Promise<void> {
+    if (audioStarted) return
+    audioStarted = true
+    await audio.start()
+    controls.setPlaying(audio.isRunning)
+  }
+
+  // --- Controls UI ---
+  const controls = createControls({
+    initialHumidity: humidityDefault,
+    onHumidity: (h) => humidity.apply(h),
+    onToggle: () => {
+      void (async () => {
+        // #2: 첫 클릭은 반드시 재생으로. justStarted이면 toggle(suspend) 스킵.
+        const justStarted = !audioStarted
+        await ensureAudioStarted()
+        if (justStarted) {
+          controls.setPlaying(true)
+          return
+        }
+        const playing = await audio.toggle()
+        controls.setPlaying(playing)
+      })()
+    },
+  })
+  document.body.appendChild(controls.element)
+
+  // pointerdown/keydown 게이트(토글 버튼 외 제스처용 — once로 중복 방지)
+  const gestureOnce = () => void ensureAudioStarted()
+  window.addEventListener('pointerdown', gestureOnce, { once: true })
+  window.addEventListener('keydown', gestureOnce, { once: true })
+
+  // --- Resize (DPR cap는 GLStage 내부) ---
+  window.addEventListener('resize', () => stage.resize())
+
+  // --- prefers-reduced-motion 변화 반영 ---
+  reducedMotion.addEventListener('change', (e) => stage.setGrainAnimated(!e.matches))
+
+  // --- rAF 렌더 루프(uTime 갱신) — #1: 핸들 저장, visibilitychange 일시정지/재개 ---
+  let rafId = 0
+  const startTime = performance.now()
+
+  function frame(now: number): void {
+    stage.setTime((now - startTime) / 1000)
+    stage.render()
+    rafId = requestAnimationFrame(frame)
+  }
+
+  function pauseLoop(): void {
+    if (rafId !== 0) {
+      cancelAnimationFrame(rafId)
+      rafId = 0
     }
   }
 
-  // 중앙 타이틀
-  ctx.textAlign = 'center'
-  ctx.fillStyle = 'rgba(200, 218, 220, 0.5)'
-  ctx.font = '300 22px ui-serif, Georgia, serif'
-  ctx.fillText('petrichor', w / 2, h / 2)
-  ctx.fillStyle = 'rgba(200, 218, 220, 0.28)'
-  ctx.font = '300 11px ui-sans-serif, system-ui'
-  ctx.fillText('Phase 0 — 새벽 2시, 교대역', w / 2, h / 2 + 22)
+  function resumeLoop(): void {
+    if (rafId === 0) {
+      rafId = requestAnimationFrame(frame)
+    }
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      pauseLoop()
+    } else {
+      resumeLoop()
+    }
+  })
+
+  // #1: pagehide — 루프 취소 + 리소스 해제
+  window.addEventListener('pagehide', () => {
+    pauseLoop()
+    stage.dispose()
+    audio.dispose()
+    events.dispose()
+  })
+
+  rafId = requestAnimationFrame(frame)
 }
 
-function resize() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2)
-  canvas.width = Math.floor(window.innerWidth * dpr)
-  canvas.height = Math.floor(window.innerHeight * dpr)
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  render()
-}
-
-window.addEventListener('resize', resize)
-resize()
+void boot()

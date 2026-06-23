@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      ogl:
+        specifier: ^1.0.11
+        version: 1.0.11
     devDependencies:
       typescript:
         specifier: ~6.0.2
@@ -222,6 +226,9 @@ packages:
     resolution: {integrity: sha512-y7Wygv/7mEOvxTuEQDB8StXdMRBWf1kR/tlhAzBRUFkB2jfcLOAxO/SHmOO2zgz1pVgK29/kyupn059/bCHdjA==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
+
+  ogl@1.0.11:
+    resolution: {integrity: sha512-kUpC154AFfxi16pmZUK4jk3J+8zxwTWGPo03EoYA8QPbzikHoaC82n6pNTbd+oEaJonaE8aPWBlX7ad9zrqLsA==}
 
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
@@ -440,6 +447,8 @@ snapshots:
       lightningcss-win32-x64-msvc: 1.32.0
 
   nanoid@3.3.15: {}
+
+  ogl@1.0.11: {}
 
   picocolors@1.1.1: {}
 
