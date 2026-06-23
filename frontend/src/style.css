@@ -1,5 +1,9 @@
 :root {
   color-scheme: dark;
+  /* 쪽타일톤 팔레트 */
+  --tile: #d2e0e2;
+  --tile-dim: rgba(210, 224, 226, 0.5);
+  --teal: #1c3a40;
 }
 
 * {
@@ -14,10 +18,96 @@ body {
   height: 100%;
   overflow: hidden;
   background: #0a0f12;
+  font-family: ui-sans-serif, system-ui, sans-serif;
 }
 
 #stage {
   display: block;
   width: 100vw;
   height: 100vh;
+}
+
+/* ---- 하단 컨트롤 (쪽타일톤 미니멀) ---- */
+.controls {
+  position: fixed;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  border-radius: 4px;
+  background: rgba(10, 16, 20, 0.45);
+  backdrop-filter: blur(8px);
+  /* 쪽타일: 흰 세로 줄눈 모티프 (faint) */
+  border: 1px solid rgba(210, 224, 226, 0.08);
+  box-shadow: 0 2px 24px rgba(0, 0, 0, 0.35);
+  user-select: none;
+}
+
+.toggle {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(210, 224, 226, 0.18);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--tile-dim);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.toggle:hover {
+  color: var(--tile);
+  border-color: rgba(210, 224, 226, 0.35);
+}
+
+.slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.slider-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--tile-dim);
+}
+
+/* 습도 슬라이더: 가는 쪽타일 트랙 */
+.humidity {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 180px;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(210, 224, 226, 0.35), rgba(28, 58, 64, 0.6));
+  cursor: pointer;
+  outline: none;
+}
+
+.humidity::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 18px;
+  border-radius: 2px;
+  background: var(--tile);
+  border: none;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
+
+.humidity::-moz-range-thumb {
+  width: 12px;
+  height: 18px;
+  border-radius: 2px;
+  background: var(--tile);
+  border: none;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
+
+.humidity:focus-visible {
+  box-shadow: 0 0 0 2px rgba(210, 224, 226, 0.4);
 }
