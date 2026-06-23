@@ -1,6 +1,9 @@
 spring:
   application:
     name: petrichor-backend
+  mvc:
+    problemdetails:
+      enabled: true   # MethodArgumentNotValidException/HandlerMethodValidationException → RFC7807 problem+json
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/petrichor}
     username: ${DB_USERNAME:petrichor}
@@ -19,6 +22,14 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_APP_PORT:6379}
+
+# 레이트리밋(in-memory per-IP token bucket; /api/v1/** 적용, actuator 제외)
+petrichor:
+  ratelimit:
+    capacity: 120
+    refill-tokens: 120
+    refill-period-seconds: 60
+    trust-forwarded-for: false   # 신뢰 프록시 뒤에서만 true로 설정(기본 off — XFF 위조 우회 차단)
 
 management:
   endpoints:
