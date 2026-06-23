@@ -6,7 +6,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 
 /**
- * 공개 읽기 API의 예외를 ProblemDetail(RFC 7807)로 일관 변환.
+ * 도메인 예외를 ProblemDetail(RFC 7807)로 변환.
+ * (events 배치 검증은 EventController가 직접 400 problem+json으로 처리한다.)
  */
 @RestControllerAdvice
 class GlobalExceptionHandler {

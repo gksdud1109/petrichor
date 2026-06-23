@@ -33,6 +33,10 @@ dependencies {
 	runtimeOnly("org.postgresql:postgresql")
 	// 캐시 / 큐 (Redis)
 	implementation("org.springframework.boot:spring-boot-starter-data-redis")
+	// 레이트리밋 (in-memory per-IP token bucket; Redis 분산은 향후)
+	implementation("com.bucket4j:bucket4j-core:8.10.1")
+	// 버킷 맵 TTL/최대크기 관리 (Spring Boot BOM 버전 관리)
+	implementation("com.github.ben-manes.caffeine:caffeine")
 	// 보안 (인증 로직은 Phase 2; Phase 0/1은 SecurityConfig로 permitAll)
 	implementation("org.springframework.boot:spring-boot-starter-security")
 	// Kotlin
