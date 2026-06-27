@@ -33,6 +33,10 @@ dependencies {
 	runtimeOnly("org.postgresql:postgresql")
 	// 캐시 / 큐 (Redis)
 	implementation("org.springframework.boot:spring-boot-starter-data-redis")
+	// 오브젝트 스토리지 (S3/MinIO/R2). AWS SDK v2는 Spring Boot BOM이 관리하지 않으므로
+	// 자체 BOM으로 버전 정렬(2.x 최신, Maven Central 확인). s3 + presigner 포함.
+	implementation(platform("software.amazon.awssdk:bom:2.46.17"))
+	implementation("software.amazon.awssdk:s3")
 	// 레이트리밋 (in-memory per-IP token bucket; Redis 분산은 향후)
 	implementation("com.bucket4j:bucket4j-core:8.10.1")
 	// 버킷 맵 TTL/최대크기 관리 (Spring Boot BOM 버전 관리)
